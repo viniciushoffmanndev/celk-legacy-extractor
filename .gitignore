@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Ignorar o backup gigante do Celk
+*.backup
+
+# Ignorar os binarios portateis do PostgreSQL
+*.exe
+*.dll
