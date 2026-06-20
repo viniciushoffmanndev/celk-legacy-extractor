@@ -1,0 +1,12 @@
+# Banco de Dados
+psycopg[binary]>=3.1.0
+
+# Validação e Modelagem de Dados
+pydantic>=2.0.0
+
+# Geração de UUIDv7 (A biblioteca oficial do Python ainda não tem nativo, a uuid6 traz o v7)
+uuid6>=2.0.0
+
+# Manipulação de Dados e Ambiente
+pandas
+python-dotenv
