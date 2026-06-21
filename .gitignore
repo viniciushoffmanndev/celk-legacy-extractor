@@ -223,3 +223,7 @@ __marimo__/
 # Ignorar os binarios portateis do PostgreSQL
 *.exe
 *.dll
+
+# Ignora dados sensíveis e staging areas (LGPD)
+data/
+*.json
