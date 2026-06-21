@@ -1,7 +1,8 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import date
-from uuid6 import uuid7, UUID
+from uuid import UUID
+from uuid6 import uuid7
 
 class PacienteSchema(BaseModel):
     """
