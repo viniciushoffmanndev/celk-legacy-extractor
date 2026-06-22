@@ -20,14 +20,23 @@ async def extrair_pacientes(tamanho_lote: int = 1000):
         async with conn.cursor() as cursor:
             while True:
                 # O OFFSET é quem faz a "paginação", pulando os registros já processados
+                # A query turbinada com o JOIN da tabela de CNS
                 query = """
                     SELECT 
-                        cd_usu_cadsus, nm_usuario, sg_sexo, 
-                        dt_nascimento, cpf, rg, celular, st_vivo 
-                    FROM usuario_cadsus 
-                    WHERE flag_unificado = 0 
-                      AND (cpf IS NULL OR cpf <> '00000000000')
-                    ORDER BY cd_usu_cadsus  -- O ORDER BY é obrigatório na paginação!
+                        u.cd_usu_cadsus, u.nm_usuario, u.sg_sexo, 
+                        u.dt_nascimento, u.cpf, u.rg, u.celular, u.st_vivo,
+                        cns.cd_numero_cartao AS cns
+                    FROM usuario_cadsus u
+                    LEFT JOIN (
+                        -- Pega apenas o CNS mais recente e ativo de cada paciente
+                        SELECT DISTINCT ON (cd_usu_cadsus) cd_usu_cadsus, cd_numero_cartao
+                        FROM usuario_cadsus_cns
+                        WHERE st_excluido = 0
+                        ORDER BY cd_usu_cadsus, dt_atribuicao DESC
+                    ) cns ON u.cd_usu_cadsus = cns.cd_usu_cadsus
+                    WHERE u.flag_unificado = 0 
+                      AND (u.cpf IS NULL OR u.cpf <> '00000000000')
+                    ORDER BY u.cd_usu_cadsus  -- O ORDER BY é obrigatório na paginação!
                     LIMIT %s OFFSET %s;
                 """
                 
