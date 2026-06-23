@@ -44,6 +44,20 @@ Uma análise quantitativa diagnóstica na base bruta (93.666 registros extraído
 
 ---
 
+### 🪄 A Mágica do Merge (Master Data Management)
+Através da rotina de consolidação local utilizando uma chave de agrupamento inteligente (CPF ou chave composta Nome + Data de Nascimento), o pipeline otimiza os dados legados **antes** de acionar a API do Governo. O cruzamento interno de fichas incompletas gerou um impacto instantâneo na higienização da base:
+
+- 🗑️ **Clones Exterminados:** 93.666 (Bruto) ➔ 92.355 (Consolidado) = **1.311 cadastros duplicados removidos**.
+- 📱 **Celulares Recuperados:** Nulos caíram de 40.541 ➔ 39.482 = **1.059 contatos restaurados** via fusão de fichas antigas.
+- 🪪 **RGs Salvos:** Nulos caíram de 72.351 ➔ 71.668 = **683 RGs resgatados** do limbo.
+- 💳 **CNS Unificados:** Nulos caíram de 19.821 ➔ 19.043 = **778 cartões SUS consolidados** na ficha principal.
+- 📉 **Otimização da Fila e-SUS:** O total de pacientes "sem CPF" caiu de 35.758 ➔ 34.558.
+
+> **💡 O Impacto Arquitetural:**
+> Ao "derreter" os clones localmente, o motor poupou **1.200 requisições desnecessárias** no barramento do e-SUS, economizando processamento e mitigando drasticamente o risco de bloqueios por *rate limit*. O município recuperou mais de mil telefones para busca ativa utilizando exclusivamente inteligência de engenharia de dados *in-house*.
+
+---
+
 ## 🛠️ Tecnologias Utilizadas
 * **Python 3.10+**
 * **Pydantic:** Para validação estrita de esquemas e contratos de dados.
