@@ -15,7 +15,7 @@ def executar_etl_cadsus():
     print("==================================================")
 
     # SEU COOKIE ATIVO (Lembre-se de renovar se for rodar lote muito grande!)
-    COOKIE = "JSESSIONID=u65_MWKxBwzyOzcTpF7KYlwfMDhNhtNSnBiSblJl; XSRF-TOKEN=1e4cd1b4-4600-4475-a583-f946f7d524e0"
+    COOKIE = "JSESSIONID=e8Ja4fLvgioEex_0kb74ZeBpkIFg914165tPvv5J; XSRF-TOKEN=c5d02899-4345-4f70-8011-b84e876e3d10"
     xsrf_match = re.search(r'XSRF-TOKEN=([^;]+)', COOKIE)
     xsrf_token = xsrf_match.group(1) if xsrf_match else ""
 
@@ -39,26 +39,26 @@ def executar_etl_cadsus():
     os.makedirs(os.path.dirname(caminho_saida), exist_ok=True)
 
     if os.path.exists(caminho_saida):
-        print("📂 Base Staging encontrada! Retomando de onde paramos...")
+        print("Base Staging encontrada! Retomando de onde paramos...")
         with open(caminho_saida, "r", encoding="utf-8") as f:
             pacientes = json.load(f)
     else:
-        print("📂 Primeira execução: Carregando base Raw...")
+        print("Primeira execução: Carregando base Raw...")
         with open(caminho_raw, "r", encoding="utf-8") as f:
             pacientes = json.load(f)
 
     alvos = [p for p in pacientes if not p.get('cpf') and p.get('cns')]
-    print(f"🎯 Fila de Processamento: {len(alvos)} pacientes pendentes de enriquecimento.\n")
+    print(f"Fila de Processamento: {len(alvos)} pacientes pendentes de enriquecimento.\n")
 
     estatisticas = {"sucessos": 0, "nao_encontrados": 0, "falhas_api": 0}
 
     # Mantemos o lote de 10 para teste!
-    for paciente in alvos[:10]:
+    for paciente in alvos[:2]:
         cns = paciente.get('cns', '')
         nome = paciente.get('nome', '')
         data_nasc_us = paciente.get('data_nascimento') or ""
         
-        print(f"\n🔎 Consultando: {nome} (CNS: {cns})")
+        print(f"\nConsultando: {nome} (CNS: {cns})")
 
         # =====================================================================
         # LISTA DE ESTRATÉGIAS (FALLBACKS)
@@ -74,7 +74,7 @@ def executar_etl_cadsus():
         paciente_resolvido = False
 
         for comb in combinacoes:
-            print(f"   🔄 Tentando por: {comb['desc']}...")
+            print(f"Tentando por: {comb['desc']}...")
             uuid_sessao = str(uuid.uuid4())
 
             # --- PASSO A: Abrir Sessão de Busca ---
@@ -98,10 +98,10 @@ def executar_etl_cadsus():
                 resp_busca = requests.post(url_graphql, headers=headers, json=payload_busca, timeout=10)
                 dados_busca = resp_busca.json()
                 if isinstance(dados_busca, list) and len(dados_busca) > 0 and "errors" in dados_busca[0]:
-                    print(f"   ❌ Rejeitado pelo e-SUS: {dados_busca[0]['errors'][0]['message']}")
+                    print(f"Rejeitado pelo e-SUS: {dados_busca[0]['errors'][0]['message']}")
                     continue # Tenta a próxima combinação
             except Exception as e:
-                print(f"   ❌ Erro de Rede no Passo A: {e}")
+                print(f"Erro de Rede no Passo A: {e}")
                 continue
 
             time.sleep(random.uniform(4.0, 7.0)) # Aguarda Brasília
@@ -110,7 +110,7 @@ def executar_etl_cadsus():
             payload_polling = [{
                 "operationName": "BuscaCidadaoCadsusPolling",
                 "variables": {"uuid": uuid_sessao},
-                "query": "query BuscaCidadaoCadsusPolling($uuid: String!) {\n  buscaCidadaosCadsusCompletoPolling(uuid: $uuid) {\n    usuario\n    uuid\n    resultCadsus\n    cidadaos {\n      cpf\n      cns\n      nome\n      nomeMae\n      dataNascimento\n      sexo\n      obito\n    }\n  }\n}"
+                "query": "query BuscaCidadaoCadsusPolling($uuid: String!) {\n  buscaCidadaosCadsusCompletoPolling(uuid: $uuid) {\n    usuario\n    uuid\n    resultCadsus\n    cidadaos {\n      cpf\n      cns\n      nome\n      nomeSocial\n      nomeMae\n      nomePai\n      racaCor {\n        id\n        nome\n        racaCorDbEnum\n        __typename\n      }\n      etnia {\n        id\n        nome\n        __typename\n      }\n      telefoneContato\n      telefoneResidencial\n      telefoneCelular\n      dataNascimento\n      dataObito\n      obito\n      sexo\n      email\n      nacionalidade {\n        id\n        nacionalidadeDbEnum\n        __typename\n      }\n      municipioNascimento {\n        id\n        ibge\n        nome\n        uf {\n          id\n          nome\n          sigla\n          __typename\n        }\n        __typename\n      }\n      paisNascimento {\n        id\n        nome\n        __typename\n      }\n      portariaNaturalizacao\n      dataEntradaBrasil\n      dataNaturalizacao\n      endereco {\n        bairro\n        cep\n        complemento\n        logradouro\n        municipio {\n          id\n          ibge\n          nome\n          uf {\n            id\n            nome\n            sigla\n            __typename\n          }\n          __typename\n        }\n        numero\n        pontoReferencia\n        semNumero\n        tipoLogradouro {\n          id\n          nome\n          numeroDne\n          __typename\n        }\n        uf {\n          id\n          nome\n          sigla\n          __typename\n        }\n        __typename\n      }\n      paisResidencia {\n        id\n        nome\n        __typename\n      }\n      municipioResidenciaExterior\n      numeroPisPasep\n      __typename\n    }\n    __typename\n  }\n}"
             }]
 
             try:
@@ -125,32 +125,33 @@ def executar_etl_cadsus():
                     dados_limpos = resultado_etl["dados"]
                     cpf_encontrado = dados_limpos.get("cpf")
                     
+                    # Injeta TODOS os dados enriquecidos da ficha do Governo no paciente local
+                    paciente.update(dados_limpos)
+                    
                     if cpf_encontrado:
-                        paciente['cpf'] = cpf_encontrado
-                        print(f"   ✅ SUCESSO! CPF capturado: {cpf_encontrado}")
+                        print(f"SUCESSO! Ficha Rica capturada. CPF: {cpf_encontrado}")
                     else:
-                        # Paciente localizado, mas o Governo não tem o CPF dele cadastrado!
                         paciente['status_busca'] = "SEM_CPF_NO_GOVERNO"
-                        print(f"   ⚠️ Cadastro localizado, mas o paciente NÃO POSSUI CPF no e-SUS.")
+                        print(f"Cadastro enriquecido, mas o paciente NÃO POSSUI CPF no e-SUS.")
                     
                     estatisticas["sucessos"] += 1
                     paciente_resolvido = True
                     break # Cai fora do loop de combinações, já resolvemos esse!
 
                 elif status == "PACIENTE_NAO_ENCONTRADO":
-                    print("   ⚠️ Não encontrado com esta combinação.")
+                    print("Não encontrado com esta combinação.")
                     time.sleep(random.uniform(2.0, 4.0)) # Pausa curta antes de tentar a próxima combinação
                 else:
-                    print(f"   ❌ Erro de API: {resultado_etl.get('mensagem')}")
+                    print(f"Erro de API: {resultado_etl.get('mensagem')}")
 
             except Exception as e:
-                print(f"   ❌ Erro executando Polling: {e}")
+                print(f"Erro executando Polling: {e}")
 
         # Fim do loop de combinações. Verificamos se o paciente foi resolvido em alguma delas.
         if not paciente_resolvido:
             paciente['status_busca'] = "NAO_ENCONTRADO_NENHUMA_COMBINACAO"
             estatisticas["nao_encontrados"] += 1
-            print("   ❌ Esgotadas todas as opções. Paciente não consta na base nacional.")
+            print("Esgotadas todas as opções. Paciente não consta na base nacional.")
 
         # Pausa longa humanizada antes de pular para o próximo paciente
         time.sleep(random.uniform(5.0, 10.0))
@@ -160,7 +161,7 @@ def executar_etl_cadsus():
             json.dump(pacientes, f, ensure_ascii=False, indent=4)
 
     print("\n==================================================")
-    print(f"🏁 Fim do Lote! Resolvidos: {estatisticas['sucessos']} | Não Encontrados: {estatisticas['nao_encontrados']}")
+    print(f"Fim do Lote! Resolvidos: {estatisticas['sucessos']} | Não Encontrados: {estatisticas['nao_encontrados']}")
     print("==================================================")
 
 if __name__ == "__main__":
