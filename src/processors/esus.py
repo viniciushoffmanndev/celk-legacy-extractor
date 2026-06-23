@@ -5,7 +5,7 @@ import requests
 import os
 import uuid
 import random
-
+from dotenv import load_dotenv
 # Importa da mesma pasta (processors)
 from validador_esus import interpretar_resposta_cadsus
 
@@ -14,8 +14,14 @@ def executar_etl_cadsus():
     print("    NIS PARAGUAÇU - MOTOR ETL E-SUS (PRODUÇÃO)    ")
     print("==================================================")
 
-    # SEU COOKIE ATIVO (Lembre-se de renovar se for rodar lote muito grande!)
-    COOKIE = "JSESSIONID=e8Ja4fLvgioEex_0kb74ZeBpkIFg914165tPvv5J; XSRF-TOKEN=c5d02899-4345-4f70-8011-b84e876e3d10"
+    load_dotenv()
+
+    COOKIE = os.getenv("ESUS_COOKIE")
+    if not COOKIE:
+        print(f"ERRO FATAL: Variável ESUS_COOKIE não encontrada no arquivo .env")
+        print(f"Crie um arquivo .env na raiz do projeto e insira o seu cookie ativo.")
+        return
+    
     xsrf_match = re.search(r'XSRF-TOKEN=([^;]+)', COOKIE)
     xsrf_token = xsrf_match.group(1) if xsrf_match else ""
 
