@@ -4,82 +4,145 @@ import re
 import requests
 import os
 
-def enriquecer_dados_esus():
+def enriquecedor_cadsus_nis_definitivo():
     print("==================================================")
-    print("    INICIANDO O ROBÔ ENRIQUECEDOR E-SUS (POC)     ")
+    print(" 🏆 NIS PARAGUAÇU - ENRIQUECEDOR GRAPHQL OFICIAL  ")
     print("==================================================")
 
-    # O "Crachá" que você pescou na aba Network
-    # Se expirar (der erro 401 ou redirecionar pro login), basta trocar esta string!
-    COOKIE = "JSESSIONID=mHvKNXWKX2Ytq414G8Mi9qKzXbxhLTSD1-Hu56ps; BIGipServerpool_app_esus=3189035180.20480.0000; f5avraaaaaaaaaaaaaaaa_session_=EKLENODADOHLBEHMLCOCLNJBKLILDKHNDABDBAKIFMBHOGBCHCLMEKPHIGEKAMKCDDFEIKCMGPNMBMIGODBCMGGDBOMINODOMFODPGFGLHPMCHGKEAGFOPGOGOPODMBK"
+    # 1. COOKIE E TOKENS ATUALIZADOS DO SEU ÚLTIMO PRINT FRESQUINHO
+    COOKIE = "JSESSIONID=yfgJEfyO_tDi3OYnBwNarkQZDQhyJ8p6TA4mr0Eg; XSRF-TOKEN=d6505230-cf3b-4e89-80bb-c24e2b6a8a6c"
     
-    headers = {
-        "Cookie": COOKIE,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
-    }
+    xsrf_match = re.search(r'XSRF-TOKEN=([^;]+)', COOKIE)
+    xsrf_token = xsrf_match.group(1) if xsrf_match else ""
 
     caminho_json = os.path.join("data", "raw", "pacientes_consolidados.json")
-    caminho_saida = os.path.join("data", "raw", "pacientes_enriquecidos.json")
+    caminho_saida = os.path.join("data", "raw", "pacientes_teste_web.json")
 
     with open(caminho_json, "r", encoding="utf-8") as f:
         pacientes = json.load(f)
 
-    # Filtra quem precisa de salvamento (Não tem CPF, mas TEM o CNS)
     alvos = [p for p in pacientes if p.get('cpf') is None and p.get('cns') is not None]
     
-    print(f"Total de pacientes precisando de CPF: {len(alvos)}")
-    print("Vamos testar com os 5 primeiros para validar a conexão...\n")
+    print(f"🎯 Pacientes na fila de processamento: {len(alvos)}")
+    print("🚀 Executando lote de testes (5 alvos) com a rota limpa do CADSUS...\n")
+
+    url_graphql = "https://esus.eparaguacu.sp.gov.br/api/graphql"
+
+    # Gêmeo idêntico dos cabeçalhos do seu navegador (Aba Cabeçalhos)
+    headers = {
+        "Host": "esus.eparaguacu.sp.gov.br",
+        "Accept": "*/*",
+        "Content-Type": "application/json",
+        "X-XSRF-TOKEN": xsrf_token,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0",
+        "Cookie": COOKIE,
+        "Origin": "https://esus.eparaguacu.sp.gov.br",
+        "apollographql-client-name": "PEC Web",
+        "apollographql-client-version": "5.4.38"
+    }
 
     sucessos = 0
-    # LIMITAMOS A 5 PARA O NOSSO TESTE INICIAL
     for paciente in alvos[:5]:
         cns = paciente['cns']
         nome = paciente['nome']
-        # Pega a data de nascimento (se for null, manda vazio para não quebrar a URL)
-        data_nasc = paciente.get('data_nascimento') or "" 
-        
-        print(f"🔎 Buscando CPF para: {nome} (CNS: {cns} | Nasc: {data_nasc})...")
+        data_nasc_us = paciente.get('data_nascimento') or ""
 
-        # A URL agora vai com os DOIS parâmetros obrigatórios!
-        url = f"https://esus.eparaguacu.sp.gov.br/cidadao?form%5BnomeCpfCns%5D={cns}&form%5BdataNascimento%5D={data_nasc}"
+        print(f"🔎 Solicitando barramento para: {nome}...")
+
+        uuid_lote = None
         
+        # JUNTANDO OS DOIS MUNDOS: Parâmetros inline dentro do formato de Lote do Apollo []
+        tentativas_mutation = [
+            f'mutation {{ buscaCidadaosCadsus(filtro: {{ nomeCpfCns: "{cns}", dataNascimento: "{data_nasc_us}" }}) }}',
+            f'mutation {{ buscaCidadaosCadsus(nomeCpfCns: "{cns}", dataNascimento: "{data_nasc_us}") }}'
+        ]
+
+        # Varre os formatos para garantir compatibilidade com o Schema do PEC
+        for query_inline in tentativas_mutation:
+            payload_busca = [{
+                "operationName": None,
+                "variables": {},
+                "query": query_inline
+            }]
+            try:
+                resp_busca = requests.post(url_graphql, headers=headers, json=payload_busca, timeout=10)
+                if resp_busca.status_code == 200:
+                    dados_busca = resp_busca.json()
+                    if isinstance(dados_busca, list) and len(dados_busca) > 0:
+                        # Se houver erros do GraphQL estruturados pelo Spring, avisa no log
+                        if "errors" in dados_busca[0]:
+                            continue
+                            
+                        data_bloco = dados_busca[0].get("data", {})
+                        if data_bloco and data_bloco.get("buscaCidadaosCadsus"):
+                            uuid_lote = data_bloco["buscaCidadaosCadsus"]
+                            break
+            except Exception:
+                continue
+
+        if not uuid_lote:
+            print("   ❌ O servidor rejeitou os formatos de Mutation ou a sessão expirou.")
+            continue
+
+        print(f"   🆔 UUID do barramento aceito: {uuid_lote}")
+        
+        # Delay de segurança para o barramento de Brasília responder o Polling
+        time.sleep(3)
+
+        # PASSO 2: Polling estruturado exatamente como o seu conteúdo capturado
+        payload_polling = [{
+            "operationName": "BuscaCidadaoCadsusPolling",
+            "variables": {"uuid": str(uuid_lote)},
+            "query": (
+                "query BuscaCidadaoCadsusPolling($uuid: String!) {\n"
+                "  buscaCidadaosCadsusCompletoPolling(uuid: $uuid) {\n"
+                "    usuario\n"
+                "    uuid\n"
+                "    resultCadsus\n"
+                "    cidadaos {\n"
+                "      cpf\n"
+                "      cns\n"
+                "      nome\n"
+                "    }\n"
+                "    __typename\n"
+                "  }\n"
+                "}\n"
+            )
+        }]
+
         try:
-            # O robô bate na porta do servidor
-            resposta = requests.get(url, headers=headers, timeout=10)
+            resp_polling = requests.post(url_graphql, headers=headers, json=payload_polling, timeout=10)
             
-            # Como a busca do e-SUS pode retornar uma tabela, a forma mais ninja de achar 
-            # o CPF é usar uma Expressão Regular (Regex) para achar o formato XXX.XXX.XXX-XX no HTML
-            cpfs_encontrados = re.findall(r'\b\d{3}\.\d{3}\.\d{3}-\d{2}\b', resposta.text)
-            
-            if cpfs_encontrados:
-                # Pega o primeiro CPF encontrado, limpa os pontos e traços
-                cpf_limpo = ''.join(filter(str.isdigit, cpfs_encontrados[0]))
-                paciente['cpf'] = cpf_limpo
-                sucessos += 1
-                print(f"SUCESSO! CPF Encontrado: {cpf_limpo}")
-            else:
-                # Se cair aqui, a sessão pode ter expirado ou o paciente não tem CPF nem no e-SUS
-                if "autenticacao" in resposta.text.lower() or "login" in resposta.url:
-                    print("ERRO: Sessão expirou! O Cookie não é mais válido.")
-                    break
-                print("Paciente não encontrado no e-SUS ou sem CPF cadastrado lá.")
+            if resp_polling.status_code == 200:
+                dados_polling = resp_polling.json()
                 
-        except Exception as e:
-            print(f"Erro de conexão: {e}")
+                if isinstance(dados_polling, list) and len(dados_polling) > 0:
+                    item_resposta = dados_polling[0]
+                    result_dto = item_resposta.get("data", {}).get("buscaCidadaosCadsusCompletoPolling", {})
+                    
+                    if result_dto and result_dto.get("resultCadsus") == "SUCESSO":
+                        cidadaos = result_dto.get("cidadaos", [])
+                        if cidadaos and cidadaos[0].get("cpf"):
+                            cpf_capturado = cidadaos[0]["cpf"]
+                            paciente['cpf'] = cpf_capturado
+                            sucessos += 1
+                            print(f"   ✅ SUCESSO ABSOLUTO! CPF Capturado: {cpf_capturado}")
+                            continue
+            
+            print("   ⚠️ Sincronização pendente ou vazia no barramento nacional.")
 
-        # REGRA DE OURO DA ENGENHARIA DE DADOS: Não faça DDoSing no servidor do cliente!
-        # Dorme 2 segundos entre cada busca para fingir ser um humano digitando.
+        except Exception as e:
+            print(f"   ❌ Erro durante a execução do Polling: {e}")
+
         time.sleep(2)
 
-    # Salvamos o progresso (mesmo que seja só o teste) num novo arquivo
+    # Grava o resultado do lote de teste
     with open(caminho_saida, "w", encoding="utf-8") as f:
         json.dump(pacientes, f, ensure_ascii=False, indent=4)
 
     print("\n==================================================")
-    print(f"Teste concluído! {sucessos} CPFs resgatados com sucesso.")
-    print(f"Arquivo salvo em: {caminho_saida}")
+    print(f"🏁 Fim do teste de rota limpa! Sucessos: {sucessos}/5")
     print("==================================================")
 
 if __name__ == "__main__":
-    enriquecer_dados_esus()
+    enriquecedor_cadsus_nis_definitivo()
