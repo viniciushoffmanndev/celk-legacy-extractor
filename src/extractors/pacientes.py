@@ -63,7 +63,7 @@ async def extrair_pacientes(tamanho_lote: int = 1000):
         # --- SALVANDO O CHECKPOINT FINAL EM JSON ---
         if pacientes_processados:
             dados_serializados = [p.model_dump(mode='json') for p in pacientes_processados]
-            caminho_arquivo = os.path.join("data", "raw", "pacientes_limpos.json")
+            caminho_arquivo = os.path.join("data", "raw", "pacientes_celk.json")
             
             with open(caminho_arquivo, "w", encoding="utf-8") as arquivo_json:
                 json.dump(dados_serializados, arquivo_json, indent=4, ensure_ascii=False)
