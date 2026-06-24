@@ -32,7 +32,7 @@ def interpretar_resposta_cadsus(resposta_bruta_api: list) -> dict:
                     "nome_pai_gov": c.nomePai,
                     "data_nascimento_gov": c.dataNascimento,
                     "sexo_gov": c.sexo,
-                    "obito_gov": c.obito,
+                    "obito_gov": str(c.obito).strip().lower() == "true",
                     "raca_cor_gov": c.racaCor.nome if c.racaCor else None,
                     "telefone_celular_gov": c.telefoneCelular[0] if c.telefoneCelular else None,
                     "telefone_residencial_gov": c.telefoneResidencial[0] if c.telefoneResidencial else None,
