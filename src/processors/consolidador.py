@@ -79,6 +79,14 @@ def consolidar_pacientes():
             # Achamos um Clone! Derrete os dados novos para dentro do mestre
             stats["clones_derretidos"] += 1
             
+            if not mestre.get('cns') and p.get('cns'):
+                mestre['cns'] = p['cns']
+                stats["cns_recuperados"] += 1
+            
+            if not mestre.get('cpf') and p.get('cpf'):
+                mestre['cpf'] = p['cpf']
+                stats["cpfs_recuperados"] += 1
+
             if not mestre.get('rg') and p.get('rg'):
                 mestre['rg'] = p['rg']
                 stats["rgs_recuperados"] += 1
@@ -86,14 +94,6 @@ def consolidar_pacientes():
             if not mestre.get('celular') and p.get('celular'):
                 mestre['celular'] = p['celular']
                 stats["celulares_recuperados"] += 1
-                
-            if not mestre.get('cns') and p.get('cns'):
-                mestre['cns'] = p['cns']
-                stats["cns_recuperados"] += 1
-
-            if not mestre.get('cpf') and p.get('cpf'):
-                mestre['cpf'] = p['cpf']
-                stats["cpfs_recuperados"] += 1
                 
             # Mantém o nome mais bem escrito/completo
             if len(p.get('nome', '')) > len(mestre.get('nome', '')):
